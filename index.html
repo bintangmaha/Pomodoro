@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fokus — Timer Pomodoro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F5F1;
+    --ink:#1C2321;
+    --ink-soft:#5B6461;
+    --line:#DEDBD2;
+    --focus:#3E6259;
+    --focus-soft:#E4ECE8;
+    --break:#B4693E;
+    --break-soft:#F3E5DA;
+    --card:#FFFFFF;
+    --ring-track:#E6E3DA;
+    --radius:22px;
+  }
+
+  html[data-theme="dark"]{
+    --paper:#15191A;
+    --ink:#EDEEEA;
+    --ink-soft:#8D948F;
+    --line:#2B302E;
+    --focus:#6FA492;
+    --focus-soft:#1E2823;
+    --break:#D68A5C;
+    --break-soft:#2C221B;
+    --card:#1D2221;
+    --ring-track:#2A2F2D;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    min-height:100vh;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    transition:background 0.3s ease, color 0.3s ease;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+
+  .app{
+    width:100%;
+    max-width:420px;
+  }
+
+  .header{
+    text-align:center;
+    margin-bottom:28px;
+    position:relative;
+  }
+
+  .header-toggles{
+    position:absolute;
+    top:2px;
+    right:0;
+    display:flex;
+    gap:6px;
+  }
+
+  .icon-toggle{
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background 0.2s ease, color 0.2s ease, border-color 0.3s ease;
+  }
+
+  .icon-toggle:hover{ background:var(--focus-soft); color:var(--focus); }
+  .icon-toggle svg{ width:16px; height:16px; }
+  .icon-toggle .icon-off{ display:none; }
+  .icon-toggle.is-off .icon-on{ display:none; }
+  .icon-toggle.is-off .icon-off{ display:flex; }
+
+  .brand{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.02em;
+    color:var(--ink);
+  }
+
+  .brand-dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--focus);
+    transition:background 0.4s ease;
+  }
+
+  .header p{
+    margin:6px 0 0;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:32px 28px 28px;
+    box-shadow:0 1px 2px rgba(28,35,33,0.04), 0 12px 32px -16px rgba(28,35,33,0.10);
+    transition:background 0.3s ease, border-color 0.3s ease;
+  }
+
+  /* Mode switch */
+  .modes{
+    display:flex;
+    background:var(--focus-soft);
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:28px;
+    gap:4px;
+  }
+
+  .mode-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:9px 6px;
+    font-family:'Inter',sans-serif;
+    font-weight:500;
+    font-size:13px;
+    color:var(--ink-soft);
+    border-radius:9px;
+    cursor:pointer;
+    transition:background 0.25s ease, color 0.25s ease;
+  }
+
+  .mode-btn.active{
+    background:var(--card);
+    color:var(--ink);
+    box-shadow:0 1px 3px rgba(28,35,33,0.12);
+  }
+
+  /* Ring + timer */
+  .ring-wrap{
+    position:relative;
+    width:260px;
+    height:260px;
+    margin:0 auto 26px;
+  }
+
+  .ring-wrap svg{
+    width:100%;
+    height:100%;
+    transform:rotate(-90deg);
+  }
+
+  .ring-track{
+    fill:none;
+    stroke:var(--ring-track);
+    stroke-width:8;
+  }
+
+  .ring-progress{
+    fill:none;
+    stroke:var(--focus);
+    stroke-width:8;
+    stroke-linecap:round;
+    transition:stroke-dashoffset 0.3s linear, stroke 0.4s ease;
+  }
+
+  .ring-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .time{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:500;
+    font-size:52px;
+    letter-spacing:-0.01em;
+    color:var(--ink);
+    line-height:1;
+  }
+
+  .session-label{
+    margin-top:8px;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--focus);
+    transition:color 0.4s ease;
+  }
+
+  .round-count{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+
+  /* Controls */
+  .controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+  }
+
+  .btn{
+    font-family:'Inter',sans-serif;
+    border:none;
+    cursor:pointer;
+    transition:transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .btn:active{ transform:scale(0.96); }
+
+  .btn-primary{
+    background:var(--focus);
+    color:#fff;
+    font-weight:600;
+    font-size:15px;
+    padding:14px 40px;
+    border-radius:14px;
+    box-shadow:0 6px 16px -6px rgba(62,98,89,0.55);
+  }
+
+  .btn-primary.is-break{
+    background:var(--break);
+    box-shadow:0 6px 16px -6px rgba(180,105,62,0.55);
+  }
+
+  .btn-secondary{
+    background:var(--focus-soft);
+    color:var(--focus);
+    width:46px;
+    height:46px;
+    border-radius:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .btn-secondary.is-break{
+    background:var(--break-soft);
+    color:var(--break);
+  }
+
+  .btn-secondary svg{ width:18px; height:18px; }
+
+  /* Settings */
+  .settings{
+    display:flex;
+    justify-content:space-between;
+    margin-top:24px;
+    padding-top:20px;
+    border-top:1px solid var(--line);
+  }
+
+  .setting{
+    text-align:center;
+    flex:1;
+  }
+
+  .setting label{
+    display:block;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+    letter-spacing:0.03em;
+  }
+
+  .stepper{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+
+  .stepper button{
+    width:22px;
+    height:22px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-size:13px;
+    cursor:pointer;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .stepper button:hover{ background:var(--focus-soft); color:var(--focus); }
+
+  .stepper span{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    font-weight:500;
+    min-width:20px;
+  }
+
+  .footer-note{
+    text-align:center;
+    margin-top:20px;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+
+  @media (max-width:380px){
+    .ring-wrap{ width:220px; height:220px; }
+    .time{ font-size:44px; }
+    .card{ padding:26px 18px 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="header-toggles">
+      <button class="icon-toggle" id="soundToggle" title="Aktif/nonaktifkan suara notifikasi">
+        <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+        <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+      </button>
+      <button class="icon-toggle" id="themeToggle" title="Ganti mode terang/gelap">
+        <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
+    <div class="brand"><span class="brand-dot" id="brandDot"></span>Fokus</div>
+    <p>Timer pomodoro untuk belajar dan bekerja</p>
+  </div>
+
+  <div class="card">
+
+    <div class="modes">
+      <button class="mode-btn active" data-mode="focus">Fokus</button>
+      <button class="mode-btn" data-mode="short">Istirahat Pendek</button>
+      <button class="mode-btn" data-mode="long">Istirahat Panjang</button>
+    </div>
+
+    <div class="ring-wrap">
+      <svg viewBox="0 0 260 260">
+        <circle class="ring-track" cx="130" cy="130" r="116"></circle>
+        <circle class="ring-progress" id="ringProgress" cx="130" cy="130" r="116"
+                stroke-dasharray="728.85" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="time" id="timeDisplay">25:00</div>
+        <div class="session-label" id="sessionLabel">Waktunya Fokus</div>
+        <div class="round-count" id="roundCount">Sesi ke-1</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-secondary" id="resetBtn" title="Ulangi sesi ini">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+      </button>
+      <button class="btn btn-primary" id="startBtn">Mulai</button>
+      <button class="btn btn-secondary" id="skipBtn" title="Lanjut ke sesi berikutnya">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+      </button>
+    </div>
+
+    <div class="settings">
+      <div class="setting">
+        <label>Fokus (menit)</label>
+        <div class="stepper" data-key="focus">
+          <button data-delta="-1">−</button>
+          <span id="valFocus">25</span>
+          <button data-delta="1">+</button>
+        </div>
+      </div>
+      <div class="setting">
+        <label>Istirahat Pendek</label>
+        <div class="stepper" data-key="short">
+          <button data-delta="-1">−</button>
+          <span id="valShort">5</span>
+          <button data-delta="1">+</button>
+        </div>
+      </div>
+      <div class="setting">
+        <label>Istirahat Panjang</label>
+        <div class="stepper" data-key="long">
+          <button data-delta="-1">−</button>
+          <span id="valLong">15</span>
+          <button data-delta="1">+</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="footer-note">4 sesi fokus akan diikuti istirahat panjang secara otomatis</p>
+</div>
+
+<script>
+(function(){
+  const durations = { focus: 25, short: 5, long: 15 };
+  const labels = { focus: "Waktunya Fokus", short: "Istirahat Sebentar", long: "Istirahat Panjang" };
+
+  let mode = "focus";
+  let secondsLeft = durations.focus * 60;
+  let totalSeconds = durations.focus * 60;
+  let timerId = null;
+  let isRunning = false;
+  let focusRoundsCompleted = 0;
+  let soundOn = true;
+  let audioCtx = null;
+
+  const timeDisplay = document.getElementById('timeDisplay');
+  const sessionLabel = document.getElementById('sessionLabel');
+  const roundCount = document.getElementById('roundCount');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const skipBtn = document.getElementById('skipBtn');
+  const ringProgress = document.getElementById('ringProgress');
+  const brandDot = document.getElementById('brandDot');
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  const themeToggle = document.getElementById('themeToggle');
+  const soundToggle = document.getElementById('soundToggle');
+
+  /* ---------- Dark mode ---------- */
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    themeToggle.classList.toggle('is-off', theme === 'dark');
+    try{ localStorage.setItem('fokus-theme', theme); }catch(e){}
+  }
+
+  function initTheme(){
+    let saved = null;
+    try{ saved = localStorage.getItem('fokus-theme'); }catch(e){}
+    if(saved === 'dark' || saved === 'light'){
+      applyTheme(saved);
+    } else {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(prefersDark ? 'dark' : 'light');
+    }
+  }
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------- Sound notifikasi ---------- */
+  function initSound(){
+    let saved = null;
+    try{ saved = localStorage.getItem('fokus-sound'); }catch(e){}
+    soundOn = saved !== 'off';
+    soundToggle.classList.toggle('is-off', !soundOn);
+  }
+
+  soundToggle.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundToggle.classList.toggle('is-off', !soundOn);
+    try{ localStorage.setItem('fokus-sound', soundOn ? 'on' : 'off'); }catch(e){}
+    if(soundOn) playChime();
+  });
+
+  function getAudioCtx(){
+    if(!audioCtx){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(Ctx) audioCtx = new Ctx();
+    }
+    return audioCtx;
+  }
+
+  function playChime(){
+    if(!soundOn) return;
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    if(ctx.state === 'suspended') ctx.resume();
+    const notes = [880, 1108.73, 1318.51];
+    notes.forEach((freq, i) => {
+      const start = ctx.currentTime + i * 0.16;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.22, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.55);
+    });
+  }
+
+  const CIRC = 2 * Math.PI * 116;
+  ringProgress.setAttribute('stroke-dasharray', CIRC.toFixed(2));
+
+  const valEls = { focus: document.getElementById('valFocus'), short: document.getElementById('valShort'), long: document.getElementById('valLong') };
+
+  function formatTime(s){
+    const m = Math.floor(s/60).toString().padStart(2,'0');
+    const sec = (s%60).toString().padStart(2,'0');
+    return m + ":" + sec;
+  }
+
+  function updateColors(){
+    const isBreak = mode !== 'focus';
+    document.documentElement.style.setProperty('--focus', isBreak ? '' : '');
+    startBtn.classList.toggle('is-break', isBreak);
+    resetBtn.classList.toggle('is-break', isBreak);
+    skipBtn.classList.toggle('is-break', isBreak);
+    ringProgress.style.stroke = isBreak ? 'var(--break)' : 'var(--focus)';
+    sessionLabel.style.color = isBreak ? 'var(--break)' : 'var(--focus)';
+    brandDot.style.background = isBreak ? 'var(--break)' : 'var(--focus)';
+  }
+
+  function render(){
+    timeDisplay.textContent = formatTime(secondsLeft);
+    sessionLabel.textContent = labels[mode];
+    roundCount.textContent = mode === 'focus'
+      ? "Sesi ke-" + (focusRoundsCompleted + 1)
+      : "Setelah sesi ke-" + focusRoundsCompleted;
+    const progress = 1 - (secondsLeft / totalSeconds);
+    ringProgress.setAttribute('stroke-dashoffset', (CIRC * progress).toFixed(2));
+    startBtn.textContent = isRunning ? "Jeda" : (secondsLeft === totalSeconds ? "Mulai" : "Lanjut");
+    document.title = formatTime(secondsLeft) + " — " + labels[mode];
+  }
+
+  function setMode(newMode, resetTime=true){
+    mode = newMode;
+    modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if(resetTime){
+      totalSeconds = durations[mode] * 60;
+      secondsLeft = totalSeconds;
+    }
+    updateColors();
+    render();
+  }
+
+  function tick(){
+    secondsLeft--;
+    if(secondsLeft <= 0){
+      clearInterval(timerId);
+      isRunning = false;
+      playChime();
+      handleSessionEnd();
+      return;
+    }
+    render();
+  }
+
+  function handleSessionEnd(){
+    if(mode === 'focus'){
+      focusRoundsCompleted++;
+      if(focusRoundsCompleted % 4 === 0){
+        setMode('long');
+      } else {
+        setMode('short');
+      }
+    } else {
+      setMode('focus');
+    }
+    render();
+  }
+
+  function startPause(){
+    if(isRunning){
+      clearInterval(timerId);
+      isRunning = false;
+    } else {
+      isRunning = true;
+      timerId = setInterval(tick, 1000);
+    }
+    render();
+  }
+
+  function resetCurrent(){
+    clearInterval(timerId);
+    isRunning = false;
+    secondsLeft = totalSeconds;
+    render();
+  }
+
+  function skipSession(){
+    clearInterval(timerId);
+    isRunning = false;
+    handleSessionEnd();
+  }
+
+  startBtn.addEventListener('click', startPause);
+  resetBtn.addEventListener('click', resetCurrent);
+  skipBtn.addEventListener('click', skipSession);
+
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      clearInterval(timerId);
+      isRunning = false;
+      setMode(btn.dataset.mode);
+    });
+  });
+
+  document.querySelectorAll('.stepper').forEach(stepper => {
+    const key = stepper.dataset.key;
+    stepper.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const delta = parseInt(btn.dataset.delta, 10);
+        let newVal = durations[key] + delta;
+        newVal = Math.max(1, Math.min(90, newVal));
+        durations[key] = newVal;
+        valEls[key].textContent = newVal;
+        if(mode === key && !isRunning){
+          totalSeconds = newVal * 60;
+          secondsLeft = totalSeconds;
+          render();
+        }
+      });
+    });
+  });
+
+  initTheme();
+  initSound();
+  updateColors();
+  render();
+})();
+</script>
+
+</body>
+</html>
