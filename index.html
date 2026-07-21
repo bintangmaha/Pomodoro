@@ -361,8 +361,8 @@
 
     <div class="modes">
       <button class="mode-btn active" data-mode="focus">Fokus</button>
-      <button class="mode-btn" data-mode="short">Rest Bentar</button>
-      <button class="mode-btn" data-mode="long">Rest Lama</button>
+      <button class="mode-btn" data-mode="short">Istirahat Pendek</button>
+      <button class="mode-btn" data-mode="long">Istirahat Panjang</button>
     </div>
 
     <div class="ring-wrap">
@@ -398,7 +398,7 @@
         </div>
       </div>
       <div class="setting">
-        <label>Rest Bentar</label>
+        <label>Istirahat Pendek</label>
         <div class="stepper" data-key="short">
           <button data-delta="-1">−</button>
           <span id="valShort">5</span>
@@ -406,7 +406,7 @@
         </div>
       </div>
       <div class="setting">
-        <label>Rest Lama</label>
+        <label>Istirahat Panjang</label>
         <div class="stepper" data-key="long">
           <button data-delta="-1">−</button>
           <span id="valLong">15</span>
@@ -417,7 +417,7 @@
 
   </div>
 
-  <p class="footer-note">4 sesi fokus akan diikuti istirahat panjang secara otomatis</p>
+  <p class="footer-note">4 sesi fokus akan diikuti istirahat panjang secara otomatis<br>Layar akan tetap menyala selama timer berjalan</p>
 </div>
 
 <script>
@@ -433,6 +433,7 @@
   let focusRoundsCompleted = 0;
   let soundOn = true;
   let audioCtx = null;
+  let wakeLock = null;
 
   const timeDisplay = document.getElementById('timeDisplay');
   const sessionLabel = document.getElementById('sessionLabel');
@@ -492,6 +493,30 @@
     return audioCtx;
   }
 
+  /* ---------- Layar tetap menyala ---------- */
+  async function requestWakeLock(){
+    if(!('wakeLock' in navigator)) return;
+    try{
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }catch(e){
+      wakeLock = null; // gagal (mis. baterai hemat daya) — timer tetap jalan seperti biasa
+    }
+  }
+
+  async function releaseWakeLock(){
+    if(wakeLock){
+      try{ await wakeLock.release(); }catch(e){}
+      wakeLock = null;
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && isRunning && !wakeLock){
+      requestWakeLock();
+    }
+  });
+
   function playChime(){
     if(!soundOn) return;
     const ctx = getAudioCtx();
@@ -535,14 +560,25 @@
     brandDot.style.background = isBreak ? 'var(--break)' : 'var(--focus)';
   }
 
-  function render(){
+  function setRingOffset(offsetVal, instant){
+    if(instant){
+      ringProgress.style.transition = 'none';
+      ringProgress.setAttribute('stroke-dashoffset', offsetVal.toFixed(2));
+      void ringProgress.offsetWidth; // force reflow so the snap applies before re-enabling
+      ringProgress.style.transition = '';
+    } else {
+      ringProgress.setAttribute('stroke-dashoffset', offsetVal.toFixed(2));
+    }
+  }
+
+  function render(instant=false){
     timeDisplay.textContent = formatTime(secondsLeft);
     sessionLabel.textContent = labels[mode];
     roundCount.textContent = mode === 'focus'
       ? "Sesi ke-" + (focusRoundsCompleted + 1)
       : "Setelah sesi ke-" + focusRoundsCompleted;
     const progress = 1 - (secondsLeft / totalSeconds);
-    ringProgress.setAttribute('stroke-dashoffset', (CIRC * progress).toFixed(2));
+    setRingOffset(CIRC * progress, instant);
     startBtn.textContent = isRunning ? "Jeda" : (secondsLeft === totalSeconds ? "Mulai" : "Lanjut");
     document.title = formatTime(secondsLeft) + " — " + labels[mode];
   }
@@ -555,7 +591,7 @@
       secondsLeft = totalSeconds;
     }
     updateColors();
-    render();
+    render(true);
   }
 
   function tick(){
@@ -563,6 +599,7 @@
     if(secondsLeft <= 0){
       clearInterval(timerId);
       isRunning = false;
+      releaseWakeLock();
       playChime();
       handleSessionEnd();
       return;
@@ -581,16 +618,17 @@
     } else {
       setMode('focus');
     }
-    render();
   }
 
   function startPause(){
     if(isRunning){
       clearInterval(timerId);
       isRunning = false;
+      releaseWakeLock();
     } else {
       isRunning = true;
       timerId = setInterval(tick, 1000);
+      requestWakeLock();
     }
     render();
   }
@@ -599,7 +637,8 @@
     clearInterval(timerId);
     isRunning = false;
     secondsLeft = totalSeconds;
-    render();
+    releaseWakeLock();
+    render(true);
   }
 
   function skipSession(){
@@ -632,7 +671,7 @@
         if(mode === key && !isRunning){
           totalSeconds = newVal * 60;
           secondsLeft = totalSeconds;
-          render();
+          render(true);
         }
       });
     });
@@ -641,7 +680,7 @@
   initTheme();
   initSound();
   updateColors();
-  render();
+  render(true);
 })();
 </script>
 
